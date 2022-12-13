@@ -1,0 +1,156 @@
+---
+title: "descriptive_stats"
+author: "Rachel Kaufman"
+date: "2022-12-10"
+output: html_document
+---
+Loading in my packages...
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(gssr)
+library(dplyr)
+```
+Goal for this markdown: Being able to produce summary statistics in R. Visual representations, output, etc. 
+
+Cleaning 
+```{r}
+data("gss_all")
+
+gss_2018 <- gss_get_yr(2018)
+
+gss_2018 <- gss_2018 %>% 
+  select(age, occ10, marital, hapmar, wrkstat,
+         childs, race, sex, reg16, agekdbrn,
+         major1, major2, partyid, rincome, height, weight) %>% 
+  haven::zap_labels() #removes the lables downloaded w gss data
+#major2 is graduate degree field
+#agekdborn is age when r had first child
+
+gss_2018 <- gss_2018 %>% 
+  mutate(female = if_else(sex == 2L, 1L, 0L))
+```
+
+For starters, let's look at the age of respondents and get some summary statistics on age. 
+```{r}
+head(gss_2018)
+
+age_sex <- gss_2018 %>% 
+  select(female, age) %>%
+  drop_na()
+
+age_DS <- gss_2018 %>% 
+  summarise(sd = sd(age, na.rm = TRUE),
+            mean = mean(age, na.rm = TRUE),
+            min = min(age, na.rm = TRUE),
+            max = max(age, na.rm = TRUE),
+            median = median(age, na.rm = TRUE),
+            range = max - min,
+            IQR = IQR(age, na.rm = TRUE)
+  )
+```
+Make sure `drop_na()` is done at the end of any pipe. Otherwise, it will drop data u will need post selecting your variables. 
+
+Let's visualize the age demographic! 
+```{r}
+ggplot(data = gss_2018, aes(x = age)) + 
+ geom_density(fill = "blue")
+
+ggplot(data = gss_2018, aes(x = age)) +
+geom_histogram()
+
+```
+
+
+What if I want to `group_by()` my descriptive statistics?
+Let's group by sex.
+```{r}
+
+age_DS <- gss_2018 %>% 
+  group_by(female) %>% 
+  summarise(sd = sd(age, na.rm = TRUE),
+            mean = mean(age, na.rm = TRUE),
+            min = min(age, na.rm = TRUE),
+            max = max(age, na.rm = TRUE),
+            median = median(age, na.rm = TRUE),
+            range = max - min,
+            IQR = IQR(age, na.rm = TRUE)
+  )
+tbl_df(age_DS)
+```
+
+
+A prettier table. 
+```{r}
+install.packages("gtsummary")
+library(gtsummary)
+tbl_summary(age_DS)
+```
+
+What if I want to show the differences in `age` across `sex`?
+```{r}
+ggplot(age_sex, aes(y = age, group = female, x = female)) +
+  geom_boxplot()
+```
+Well, very small differences. This makes since considering the previously presented summary statistics. 
+
+Now let's look at something with likely more variety.
+Let's look at `weight` differences according to `sex` using `group_by()`. 
+```{r}
+weight_sex <- gss_2018 %>% 
+  select(female, weight, height, sex) %>% 
+  drop_na()
+
+
+weight_sex_DS <- weight_sex %>% 
+  group_by(female) %>% 
+  summarise(sd = sd(weight),
+            mean = mean(weight),
+            median = median(weight),
+            IQR = IQR(weight))
+tibble(weight_sex_DS)
+tbl_summary(weight_sex_DS) 
+
+```
+
+Let's look at an overlapping histogram using our `female` and `weight` variables. 
+```{r}
+
+ggplot(weight_sex, aes(x = weight, color = female)) + 
+  geom_histogram(color = "darkblue", fill = "lightblue", alpha = 0.6) +
+  labs(title = "Weight (LB) by Female and Male") +
+  facet_wrap(~female)
+
+#OR
+weight_sex <- weight_sex %>% 
+  mutate(sex_factor =  if_else(sex == 2L, "Female", "Male"))
+
+ggplot(weight_sex, aes(x = weight, fill = sex_factor)) +
+  geom_histogram(alpha = .6, position = "identity", bins = 50) +
+  labs(title = "Weight (LB): Female and Male",
+       subtitle = "GSS 2018") +
+  theme(legend.position = "bottom")
+ 
+```
+
+What if I wanted a box plot?
+```{r}
+ggplot(weight_sex, aes(x = weight, color = sex_factor)) +
+  geom_boxplot() +
+  labs(title = "Box Plot of Female and Male Weight (LB)",
+       subtitle = "GSS 2018")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
